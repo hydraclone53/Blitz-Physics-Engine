@@ -15,10 +15,15 @@ cbuffer ConstantBufferGlow : register(b2)
     float glowIntensity;
     float3 glowPadding;
 };
-
+cbuffer CBufSpherePos : register(b3)
+{
+    float3 sphereCenter;
+    float padding3;
+};
 struct PSIn
 {
     float4 pos : SV_Position;
+    float3 worldPos : WORLDPOS;
     float3 normal : NORMAL;
     float3 localNormal : LOCAL_NORMAL;
 };
@@ -26,7 +31,8 @@ struct PSIn
 
 float4 main(PSIn input, uint tid : SV_PrimitiveID) : SV_Target
 {
-    
+  
+ 
     float4 finalColor;
     
     if (renderMode == 0)
@@ -39,18 +45,23 @@ float4 main(PSIn input, uint tid : SV_PrimitiveID) : SV_Target
        // 1. Measure the strength of the polarization field
         float fieldStrength = length(polarDir);
         
-        if (fieldStrength < 0.01f)
+        if (fieldStrength > 0.01f)
         {
             finalColor = float4(0.0f, 1.0f, 0.0f, 1.0f); // Solid Green
         }
         else
         {
             // 2. Polarized state: Multi-band gradient (Blue -> Green -> Red)
-            float3 normalizedPolarDir = polarDir / fieldStrength;
-            float dotProduct = dot(normalize(input.normal), normalizedPolarDir);
-            
+            //float3 normalizedPolarDir = polarDir / fieldStrength;
+            float3 normalizedPolarDir = float3(1.0f, 0.0f, 0.0f);
+           // float3 worldNormal = normalize(input.normal);
+            float projection = dot(input.worldPos - sphereCenter, normalizedPolarDir);
+            //float dotProduct = dot(float3(0.5f, 0.0f, 0.2f), normalizedPolarDir);
+             
             // lerpVal goes from 0.0 (opposite tip) to 1.0 (aligned tip). 0.5 is the middle equator.
-            float lerpVal = dotProduct * 0.5f + 0.5f;
+           // float lerpVal = dotProduct * 0.5f + 0.5f;
+            float lerpVal = (projection / 0.5f) * 0.5f + 0.5f;
+            lerpVal = clamp(lerpVal, 0.0f, 1.0f);
             
             float4 blue = float4(0.0f, 0.0f, 1.0f, 1.0f);
             float4 green = float4(0.0f, 1.0f, 0.0f, 1.0f);
@@ -70,14 +81,14 @@ float4 main(PSIn input, uint tid : SV_PrimitiveID) : SV_Target
             }
         }
     }
-    else
+   /* else
     {
         // Blend both
         float4 face = face_colors[(tid / 2) % 6];
         float dotProduct = dot(normalize(input.normal), normalize(polarDir));
         float lerpVal = dotProduct * 0.5f + 0.5f;
         finalColor = face * float4(lerpVal, 0.0f, 1.0f - lerpVal, 1.0f);
-    }  
+    }  */
     float4 glowColor = float4(1.0f, 0.9f, 0.6f, 1.0f); // warm white, like a hot filament
     finalColor = lerp(finalColor, glowColor, glowIntensity);
     return finalColor;

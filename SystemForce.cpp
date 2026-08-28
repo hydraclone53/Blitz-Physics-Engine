@@ -1,107 +1,149 @@
 #include "SystemForce.h"
-namespace dx = DirectX;
+#include "PhysConstants.h"
+#include <cmath>
+#include <chrono>
+#include "imgui/imgui.h"
 
-// F = KQ^2/r^3 (magnitude)
-void InterForce::PairForce::CalcCForce(std::vector<PhysicsBody*>& bodies) {
-	
-	for (int j = 0; j < bodies.size();++j) {
-		dx::XMVECTOR currentpos = bodies[j]->GetPosVector();
-		for (int i = j+1; i < bodies.size();++i) {
-
-				dx::XMVECTOR bufferpos = bodies[i]->GetPosVector();
-				dx::XMVECTOR dist = dx::XMVectorSubtract(currentpos, bufferpos);
-				dx::XMVECTOR buffer_dist_sq = dx::XMVector3LengthSq(dist);
-				float dist_sq = dx::XMVectorGetX(buffer_dist_sq)+1.5f; // adds buffer to prevent 1/r divergence
-				float dist_cb = dist_sq * std::sqrt(dist_sq);
-
-				// If body is neutral, add the field to the location where nuetral body is
-				if (bodies[i]->GetCharge() == 0) {
-					dx::XMVECTOR CfieldBuffer = dx::XMVectorScale(dist, -1.0f * PhysConst::GetK() / (dist_cb) * (float)bodies[j]->GetCharge());
-					bodies[i]->AddElocal(CfieldBuffer);
-				}
-				else if (bodies[j]->GetCharge() == 0) {
-					dx::XMVECTOR CfieldBuffer = dx::XMVectorScale(dist, PhysConst::GetK() / (dist_cb) * (float)bodies[i]->GetCharge());
-					bodies[j]->AddElocal(CfieldBuffer);
-				}
-
-				dx::XMVECTOR CforceBuffer = dx::XMVectorScale(dist, PhysConst::GetK() / (dist_cb) * (float)bodies[j]->GetCharge() * (float)bodies[i]->GetCharge());
-				// Only apply Coulomb force if both are charged
-				if (bodies[i]->GetCharge() != 0 && bodies[j]->GetCharge() != 0) {
-					bodies[i]->AddInterForce(dx::XMVectorScale(CforceBuffer, -1.0f));
-					bodies[j]->AddInterForce(CforceBuffer);
-				}
-				
-			
-		}
-	}
-		
-}
-
-// Dipole force on charged body from induced dipole p at neutral sphere:
-// F = k*q/r^3 * [3(p.r_hat)r_hat - p]
-void InterForce::FieldForce::CalcEPolar(std::vector<PhysicsBody*>& bodies, PhysicsBody* p) {
-	// 0.05 is susceptibility
-	// where p = chi * E_total (induced dipole moment)
-	dx::XMVECTOR polar = dx::XMVectorScale(p->GetEtotal(),0.05f);
-	dx::XMVECTOR currentpos = p->GetPosVector();
-	if (p->GetCharge() == 0) {
-		for (int i = 0; i < bodies.size();++i) {
-			if (p != bodies[i] && bodies[i]->GetCharge() != 0) {
-				dx::XMVECTOR bufferpos = bodies[i]->GetPosVector();
-				dx::XMVECTOR dist = dx::XMVectorSubtract(bufferpos, currentpos);
-				dx::XMVECTOR buffer_dist_sq = dx::XMVector3LengthSq(dist);
-				float dist_sq = dx::XMVectorGetX(buffer_dist_sq) + 1.5f; // same buffer in coloumb
-				float dist_cb = dist_sq * std::sqrt(dist_sq);
-				dx::XMVECTOR polarForce = dx::XMVectorScale(dx::XMVectorSubtract(dx::XMVectorScale(dx::XMVectorMultiply(dx::XMVector3Dot(dist, polar), dist), 3.0f / dist_sq), polar), PhysConst::GetK() * bodies[i]->GetCharge() / dist_cb);
-				bodies[i]->AddInterForce(polarForce);
-				p->AddInterForce(dx::XMVectorScale(polarForce, -1.0f));
-			}
-		}
-		
-	}
-
-}
-
-// F = 24 * epsilon / r * (2*(sigma/r)^12 - (sigma/r)^6),  repulsive-only term: 24 * epsilon / r * (2*(sigma/r)^12
-void InterForce::PairForce::CalcVandForce(std::vector<PhysicsBody*>& bodies)
+void InterForce::PairForce::CalcCForce(PhysicsWorld& world, SpatialHash& hash)
 {
-	constexpr float sigma = 1.0f;
-	constexpr float epsilon = 2.0f;
-	constexpr float r_min = 0.6f;            // clamp factor
-	constexpr float r_min_sq = r_min * r_min;
-	constexpr float sigma_sq = sigma * sigma;
+    for (int j = 0; j < world.count; j++)
+    {
+        hash.QueryNeighbors(j, neighbors);
 
-	for (size_t j = 0; j < bodies.size(); ++j)
-	{
-		dx::XMVECTOR posJ = bodies[j]->GetPosVector();
-		for (size_t i = j + 1; i < bodies.size(); ++i)
-		{
-			dx::XMVECTOR dist = dx::XMVectorSubtract(posJ, bodies[i]->GetPosVector());
-			float r_sq = dx::XMVectorGetX(dx::XMVector3LengthSq(dist));
+        float jx = world.posX[j], jy = world.posY[j], jz = world.posZ[j];
+        int   q_1 = world.charge[j];
 
-			// clamp the *effective* distance, never let r_sq go below r_min_sq
-			float r_sq_clamped = (r_sq < r_min_sq) ? r_min_sq : r_sq;
+        for (int idx : neighbors)
+        {
+            if (idx <= j) continue;
 
-			float sr2 = sigma_sq / r_sq_clamped;     // (sigma/r)^2
-			float sr6 = sr2 * sr2 * sr2;             // (sigma/r)^6
-			float sr12 = sr6 * sr6;                  // (sigma/r)^12
+            int q_2 = world.charge[idx];
+            if (q_1 == 0 && q_2 == 0) continue;
 
-			// magnitude of repulsive LJ force / r  (so we can scale `dist` vector directly)
-			//float forceScale = 24.0f * epsilon * sr12 / r_sq_clamped;
-			float forceScale = 24.0f * epsilon * (2.0f * sr12 - sr6) / r_sq_clamped;
+            float dx = jx - world.posX[idx];
+            float dy = jy - world.posY[idx];
+            float dz = jz - world.posZ[idx];
+            float dist_sq = dx * dx + dy * dy + dz * dz + 1.5f;
+            float dist_cb = dist_sq * std::sqrt(dist_sq);
+            float k = PhysConst::GetK();
 
-			dx::XMVECTOR CforceBuffer = dx::XMVectorScale(dist, forceScale);
-			bodies[i]->AddInterForce(dx::XMVectorScale(CforceBuffer, -1.0f));
-			bodies[j]->AddInterForce(CforceBuffer);
-		}
-	}
+            if (q_2 == 0)
+            {
+                float scale = -k / dist_cb * (float)q_1;
+                world.eLocalX[idx] += dx * scale;
+                world.eLocalY[idx] += dy * scale;
+                world.eLocalZ[idx] += dz * scale;
+            }
+            else if (q_1 == 0)
+            {
+                float scale = k / dist_cb * (float)q_2;
+                world.eLocalX[j] += dx * scale;
+                world.eLocalY[j] += dy * scale;
+                world.eLocalZ[j] += dz * scale;
+            }
+
+            if (q_1 != 0 && q_2 != 0)
+            {
+                float scale_2 = k / dist_cb * (float)q_1;
+                float scale_1 = k / dist_cb * (float)q_2;
+                world.E_FieldX[idx] -= dx * scale_2;
+                world.E_FieldY[idx] -= dy * scale_2;
+                world.E_FieldZ[idx] -= dz * scale_2;
+                world.E_FieldX[j] += dx * scale_1;
+                world.E_FieldY[j] += dy * scale_1;
+                world.E_FieldZ[j] += dz * scale_1;
+            }
+        }
+    }
 }
 
-//using Abraham-Lorentz approx. (accel. over jerk)
-void InterForce::RadiationForce::ApplyLarmorDamping(float dt, PhysicsBody* body) noexcept
+void InterForce::PairForce::CalcVandForce(PhysicsWorld& world, SpatialHash& hash)
 {
-	if (body->GetCharge() == 0) return;  // neutral bodies don't radiate
+    constexpr float sigma = 1.0f;
+    constexpr float epsilon = 2.0f;
+    constexpr float r_min_sq = 0.36f;
+    constexpr float sigma_sq = sigma * sigma;
 
-	dx::XMVECTOR radiationForce = dx::XMVectorScale(body->GetAccel(), -(float)(body->GetCharge() * body->GetCharge()) * PhysConst::GetB());
-	body->AddInterForce(radiationForce);
+    for (auto& p : hash.pairs)  // iterate flat pair list — no hash lookups
+    {
+        int a = p.a, b = p.b;
+
+        float dx = world.posX[a] - world.posX[b];
+        float dy = world.posY[a] - world.posY[b];
+        float dz = world.posZ[a] - world.posZ[b];
+        float r_sq = dx * dx + dy * dy + dz * dz;
+        float r_sq_c = r_sq < r_min_sq ? r_min_sq : r_sq;
+
+        float sr2 = sigma_sq / r_sq_c;
+        float sr6 = sr2 * sr2 * sr2;
+        float sr12 = sr6 * sr6;
+        float scale = 24.0f * epsilon * (2.0f * sr12 - sr6) / r_sq_c;
+
+        world.forceX[b] -= dx * scale;
+        world.forceY[b] -= dy * scale;
+        world.forceZ[b] -= dz * scale;
+        world.forceX[a] += dx * scale;
+        world.forceY[a] += dy * scale;
+        world.forceZ[a] += dz * scale;
+    }
+}
+void InterForce::FieldForce::CalcEPolar(PhysicsWorld& world, SpatialHash& hash)
+{
+    for (int j = 0; j < world.count; j++)
+    {
+        if (world.charge[j] != 0) continue;
+
+        float px = world.eTotalX[j] * 0.05f;
+        float py = world.eTotalY[j] * 0.05f;
+        float pz = world.eTotalZ[j] * 0.05f;
+
+        float jx = world.posX[j], jy = world.posY[j], jz = world.posZ[j];
+
+        hash.QueryNeighbors(j, neighbors);
+
+        for (int idx : neighbors)
+        {
+            if (world.charge[idx] == 0) continue;
+
+            float dx = world.posX[idx] - jx;
+            float dy = world.posY[idx] - jy;
+            float dz = world.posZ[idx] - jz;
+            float dist_sq = dx * dx + dy * dy + dz * dz + 1.5f;
+            float dist_cb = dist_sq * std::sqrt(dist_sq);
+
+            float dot = dx * px + dy * py + dz * pz;
+            float scale_neut = PhysConst::GetK() * (float)world.charge[idx] / dist_cb;
+            float scale_charged = PhysConst::GetK()  / dist_cb;
+
+            float forceX = scale_neut * (3.0f * dot / dist_sq * dx - px);
+            float forceY = scale_neut * (3.0f * dot / dist_sq * dy - py);
+            float forceZ = scale_neut * (3.0f * dot / dist_sq * dz - pz);
+
+            float fieldX = scale_charged * (3.0f * dot / dist_sq * dx - px);
+            float fieldY = scale_charged * (3.0f * dot / dist_sq * dy - py);
+            float fieldZ = scale_charged * (3.0f * dot / dist_sq * dz - pz);
+
+
+            world.E_FieldX[idx] += fieldX;
+            world.E_FieldY[idx] += fieldY;
+            world.E_FieldZ[idx] += fieldZ;
+            world.forceX[j] -= forceX;
+            world.forceY[j] -= forceY;
+            world.forceZ[j] -= forceZ;
+        }
+    }
+}
+
+void InterForce::RadiationForce::ApplyLarmorDamping(float dt,
+    PhysicsWorld& world,
+    int idx) noexcept
+{
+    if (world.charge[idx] == 0) return;
+
+    float b = PhysConst::GetB();
+    float q2 = (float)(world.charge[idx] * world.charge[idx]);
+
+    world.forceX[idx] -= world.accelX[idx] * q2 * b;
+    world.forceY[idx] -= world.accelY[idx] * q2 * b;
+    world.forceZ[idx] -= world.accelZ[idx] * q2 * b;
 }

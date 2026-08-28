@@ -1,32 +1,30 @@
 #pragma once
-#include "Graphics.h"
-#include "DrawableBase.h"
-#include "PhysicsBody.h"
-#include "PhysConstants.h"
+#include "PhysicsWorld.h"
+#include "SpatialHash.h"
 
-class PhysicsBody;
+namespace InterForce
+{
+    class PairForce
+    {
+    public:
+        void CalcCForce(PhysicsWorld& world, SpatialHash& hash);
+        void CalcVandForce(PhysicsWorld& world, SpatialHash& hash);
+        int totalNeighbors;
+    private:
+        std::vector<int> neighbors;
+    };
 
-namespace InterForce {
+    class FieldForce
+    {
+    public:
+        void CalcEPolar(PhysicsWorld& world, SpatialHash& hash);
+    private:
+        std::vector<int> neighbors;
+    };
 
-	//calculate force based on pairs
-	class PairForce {
-	public:
-		void CalcCForce(std::vector<PhysicsBody*>& bodies);
-		void CalcVandForce(std::vector<PhysicsBody*>& bodies);
-	private:
-		DirectX::XMVECTOR Cforce = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
-	};
-
-	//calculate force based on field
-	class FieldForce {
-	public:
-		void CalcEPolar(std::vector<PhysicsBody*>& bodies, PhysicsBody* p);
-	private:
-	};
-	class RadiationForce {
-	public:
-		void ApplyLarmorDamping(float dt, PhysicsBody* b) noexcept;
-	};
-};
-
-
+    class RadiationForce
+    {
+    public:
+        void ApplyLarmorDamping(float dt, PhysicsWorld& world, int idx) noexcept;
+    };
+}

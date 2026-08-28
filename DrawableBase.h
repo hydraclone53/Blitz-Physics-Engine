@@ -5,6 +5,11 @@
 template<class T>
 class DrawableBase : public Drawable
 {
+public:
+	static void ClearStaticBinds() noexcept
+	{
+		staticBinds.clear();
+	}
 protected:
 	static bool IsStaticInitialized() noexcept
 	{

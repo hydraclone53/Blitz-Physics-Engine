@@ -1,4 +1,5 @@
 #include "PhysicsBody.h"
+#include "PhysConstants.h"
 namespace dx = DirectX;
 PhysicsBody::PhysicsBody(float x, float y, float z, float dx, float dy, float dz, int charge, float mass) noexcept
 	:
@@ -15,10 +16,17 @@ PhysicsBody::PhysicsBody(float x, float y, float z, float dx, float dy, float dz
 }
 void PhysicsBody::StepBoris(float dt) noexcept
 {
+	// read u directly from storage
+	dx::XMVECTOR u = dx::XMVectorSet(di, dj, dk, 0.0f);
+
+	// compute gamma from current u — stored for external use
+	float u_sq = dx::XMVectorGetX(dx::XMVector3LengthSq(u));
+	gamma = std::sqrt(1.0f + u_sq / (PhysConst::c * PhysConst::c));
 
 	dx::XMFLOAT3 E_field = field.GetEfield(i, j, k);
 	dx::XMFLOAT3 B_field = field.GetMfield(i, j, k);
 	float q_over_m = (float)q / mass;
+
 	dx::XMVECTOR Ex_F;
 	dx::XMVECTOR electric_push_step;
 	if (q == 0) {
@@ -26,49 +34,45 @@ void PhysicsBody::StepBoris(float dt) noexcept
 		electric_push_step = dx::XMVectorScale(Ex_F, 1.0f / mass * dt * 0.5f);
 	}
 	else {
-		Ex_F = dx::XMVectorAdd(dx::XMVectorScale(externalF, 1.0f / (float)q), dx::XMLoadFloat3(&E_field));
+		Ex_F = dx::XMVectorAdd(dx::XMVectorScale(externalF, 1.0f / (float)q),
+			dx::XMLoadFloat3(&E_field));
 		electric_push_step = dx::XMVectorScale(Ex_F, q_over_m * dt * 0.5f);
 	}
 
 	dx::XMVECTOR B = dx::XMLoadFloat3(&B_field);
 
+	// --- STEP 1: FIRST ELECTRIC HALF-PUSH (in u space) ---
+	dx::XMVECTOR u_minus = dx::XMVectorAdd(u, electric_push_step);
 
-	// --- STEP 1: FIRST ELECTRIC HALF-PUSH ---
-	dx::XMVECTOR v_minus = dx::XMVectorAdd(GetVelVector(), electric_push_step);
-
-	// --- STEP 2: PURE MAGNETIC ROTATION ---
-	// Calculate t vector: (q*B/m) * (dt/2)
-	dx::XMVECTOR t = dx::XMVectorScale(B, q_over_m * dt * 0.5f);
-
-	// Calculate Magnitude Squared of t: |t|^2
-	dx::XMVECTOR t_mag_sq = dx::XMVector3LengthSq(t);
-	float t_len_sq = dx::XMVectorGetX(t_mag_sq);
-
-	// Calculate s vector: 2 * t / (1 + |t|^2)
+	// --- STEP 2: MAGNETIC ROTATION (divided by gamma) ---
+	dx::XMVECTOR t = dx::XMVectorScale(B, q_over_m * dt / (2.0f * gamma));
+	float t_len_sq = dx::XMVectorGetX(dx::XMVector3LengthSq(t));
 	dx::XMVECTOR s = dx::XMVectorScale(t, 2.0f / (1.0f + t_len_sq));
 
-	// Boris cross product rotation operations
-	dx::XMVECTOR v_minus_cross_t = dx::XMVector3Cross(v_minus, t);
-	dx::XMVECTOR v_prime = dx::XMVectorAdd(v_minus, v_minus_cross_t);
-
-	dx::XMVECTOR v_prime_cross_s = dx::XMVector3Cross(v_prime, s);
-	dx::XMVECTOR v_plus = dx::XMVectorAdd(v_minus, v_prime_cross_s);
+	dx::XMVECTOR u_prime = dx::XMVectorAdd(u_minus, dx::XMVector3Cross(u_minus, t));
+	dx::XMVECTOR u_plus = dx::XMVectorAdd(u_minus, dx::XMVector3Cross(u_prime, s));
 
 	// --- STEP 3: SECOND ELECTRIC HALF-PUSH ---
-	dx::XMVECTOR v_next = dx::XMVectorAdd(v_plus, electric_push_step);
+	dx::XMVECTOR u_next = dx::XMVectorAdd(u_plus, electric_push_step);
 
-	//store accel.
+	// compute acceleration before storing u_next
 	acceleration = dx::XMVectorScale(
-		dx::XMVectorSubtract(v_next, GetVelVector()),
+		dx::XMVectorSubtract(u_next, u),
 		1.0f / dt
 	);
 
-	// --- STEP 4: POSITION UPDATE (Leapfrog step) ---
-	dx::XMVECTOR pos_next = dx::XMVectorAdd(GetPosVector(), dx::XMVectorScale(v_next, dt));
+	// --- STEP 4: POSITION UPDATE ---
+	// compute gamma_next from u_next for velocity conversion
+	float u_next_sq = dx::XMVectorGetX(dx::XMVector3LengthSq(u_next));
+	float gamma_next = std::sqrt(1.0f + u_next_sq / (PhysConst::c * PhysConst::c));
+	dx::XMVECTOR v_next = dx::XMVectorScale(u_next, 1.0f / gamma_next);
 
-	// 4. Save results 
-	dx::XMStoreFloat3((dx::XMFLOAT3*)&i, pos_next); // Stores to i, j, k sequentially
-	dx::XMStoreFloat3((dx::XMFLOAT3*)&di, v_next);
+	dx::XMVECTOR pos_next = dx::XMVectorAdd(GetPosVector(),
+		dx::XMVectorScale(v_next, dt));
+
+	// store u_next (not v_next) into di,dj,dk
+	dx::XMStoreFloat3((dx::XMFLOAT3*)&i, pos_next);
+	dx::XMStoreFloat3((dx::XMFLOAT3*)&di, u_next);
 }
 dx::XMVECTOR PhysicsBody::GetPolarizedVector(
 	dx::XMVECTOR Etot,
@@ -91,6 +95,7 @@ dx::XMVECTOR PhysicsBody::GetPolarizedVector(
 
 		return localEtot;
 	}
+	return dx::XMVectorZero();
 }
 
 void PhysicsBody::AddInterForce(dx::XMVECTOR force) noexcept
@@ -161,7 +166,8 @@ dx::XMVECTOR PhysicsBody::GetPosVector() const noexcept
 }
 dx::XMVECTOR PhysicsBody::GetVelVector() const noexcept
 {
-	return dx::XMVectorSet(di, dj, dk, 0.0f);
+		dx::XMVECTOR u = dx::XMVectorSet(di, dj, dk, 0.0f);
+		return dx::XMVectorScale(u, 1.0f / gamma);
 }
 float PhysicsBody::GetRadiationIntensity() noexcept
 {

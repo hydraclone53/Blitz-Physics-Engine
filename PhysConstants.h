@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 
+
 namespace PhysConst
 {
     inline constexpr float pi = 3.14159265358979f;
@@ -19,13 +20,15 @@ namespace PhysConst
     // Polarization
 
     // Speed of light
-    inline float c = 10.0f;  // non-constexpr — runtime tunable
+    inline float c = 100.0f;  // non-constexpr — runtime tunable
+    inline float gamma = 1.0f;
 
     // Larmor damping — derived, not arbitrary
     // b = 2k / 3c³ from Abraham-Lorentz formula
     inline float GetB() noexcept
     {
-        return (2.0f * GetK()) / (3.0f * c * c * c);
+        float b = (2.0f * GetK()) / (3.0f * c * c * c);
+        return b < 0.1f ? b : 0.1f;
     }
 
     // Substepping

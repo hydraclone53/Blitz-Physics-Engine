@@ -7,17 +7,19 @@ namespace dx = DirectX;
 
 
 Sphere::Sphere(Graphics& gfx,
-	std::mt19937& rng,
+	PhysicsWorld& world,
+	int bodyIndex,
 	std::uniform_real_distribution<float>& adist,
 	std::uniform_real_distribution<float>& ddist,
 	std::uniform_real_distribution<float>& odist,
-	std::uniform_real_distribution<float>& rdist,
-	std::uniform_int_distribution<int>& ch)
+	std::mt19937& rng)
 	:
 	
 	pGfx(&gfx),
-	q(ch(rng)),
-	r(rdist(rng)),
+	pWorld(&world),
+	bodyIndex(bodyIndex),
+	q(world.charge[bodyIndex]),
+	r(1.0f),
 	droll(ddist(rng)),
 	dpitch(ddist(rng)),
 	dyaw(ddist(rng)),
@@ -29,54 +31,45 @@ Sphere::Sphere(Graphics& gfx,
 	//phi(adist(rng)),
 	
 {
-	float x = rdist(rng);
-	float y = rdist(rng);
-	float z = rdist(rng);
-	float di = 0.0f;
-	float dj = 0.0f;
-	float dk = 0.0f;
-	body = PhysicsBody(x, y, z, di, dj, dk, q, mass);
 
 	if (!IsStaticInitialized())
 	{
 		struct Vertex
 		{
-			struct
-			{
-				float x;
-				float y;
-				float z;
-			} pos;
+			float x, y, z;   // position
+			float nx, ny, nz;  // normal
 		};
+		static_assert(sizeof(Vertex) == 24u, "Vertex size is wrong");
+
 		// --- 1. SPHERICAL GEOMETRY GENERATION ---
-		const int latDiv = 20;   // Vertical resolution (tessellation)
-		const int longDiv = 20;  // Horizontal resolution
-		float radius = 0.5f;
-		const int radDiv = 20;
+		const int latDiv = 20;
+		const int longDiv = 20;
+		const float radius = 0.5f;
 		std::vector<Vertex> vertices;
 
-		// Latitude loop (Phi goes from 0 to PI, North Pole to South Pole)
 		for (int i = 0; i <= latDiv; ++i)
 		{
 			float phi = dx::XM_PI * (float)i / (float)latDiv;
 
-			// Longitude loop (Theta goes from 0 to 2*PI, wrapping around the equator)
 			for (int j = 0; j <= longDiv; ++j)
 			{
-
-
 				float theta = dx::XM_2PI * (float)j / (float)longDiv;
+
+				// unit normal — direction from sphere center to surface point
+				float nx = sinf(phi) * cosf(theta);
+				float ny = sinf(phi) * sinf(theta);
+				float nz = cosf(phi);
+
 				Vertex v;
-				// Convert Spherical Coordinates to Cartesian (X, Y, Z)
-
-				v.pos.x = radius * sinf(phi) * cosf(theta);
-				v.pos.y = radius * sinf(phi) * sinf(theta);
-				v.pos.z = radius * cosf(phi);
+				v.x = radius * nx;   // position = normal * radius
+				v.y = radius * ny;
+				v.z = radius * nz;
+				v.nx = nx;             // normal = unit direction
+				v.ny = ny;
+				v.nz = nz;
 				vertices.push_back(v);
-
-
 			}
-		};
+		}
 		AddStaticBind(std::make_unique<VertexBuffer>(gfx, vertices));
 
 		auto pvs = std::make_unique<VertexShader>(gfx, L"VertexShader.cso");
@@ -128,7 +121,7 @@ Sphere::Sphere(Graphics& gfx,
 	}
 	
 	
-	qb.polarizationDirection = { 0.0f,0.0f,0.0f };
+	qb.polarizationDirection = { 1.0f,0.0f,0.0f };
 	qb.padding = 0.0f;
 	auto pCbuf = std::make_unique<PixelConstantBuffer<ConstantBufferQ>>(gfx, qb, 1u);
 	pPolarCbuf = pCbuf.get();
@@ -198,47 +191,109 @@ void Sphere::Update(float dt) noexcept
 
 	namespace dx = DirectX;
 
-	float ex = dx::XMVectorGetX(body.GetEtotal());
-	float ey = dx::XMVectorGetY(body.GetEtotal());
-	float ez = dx::XMVectorGetZ(body.GetEtotal());
+	// update polarization shader for neutral spheres
+	if (q == 0)
+		UpdatePixelColor(*pGfx);
 
+	// update glow shader for charged spheres
+	if (q != 0)
+		UpdateGlow(*pGfx);
 
-	body.AddEtotal();
-	UpdatePixelColor(*pGfx, body.GetEtotal());
-	body.StepBoris(dt);
-	UpdateGlow(*pGfx);
-	body.ResetAccumulators();
 }
+/*DirectX::XMMATRIX Sphere::GetTransformXM() const noexcept
+{
+	namespace dx = DirectX;
 
+	// get velocity direction from physics body
+	dx::XMVECTOR vel = body.GetVelVector();
+	float v_sq = dx::XMVectorGetX(dx::XMVector3LengthSq(vel));
+
+	// build contraction matrix along velocity direction
+	dx::XMMATRIX contractionMatrix = dx::XMMatrixIdentity();
+
+	if (v_sq > 1e-6f)
+	{
+		float gamma = body.GetGamma();
+		float contraction = 1.0f / gamma;  // < 1.0 when moving fast
+
+		// normalized velocity direction
+		float v_mag = std::sqrt(v_sq);
+		float vx = dx::XMVectorGetX(vel) / v_mag;
+		float vy = dx::XMVectorGetY(vel) / v_mag;
+		float vz = dx::XMVectorGetZ(vel) / v_mag;
+
+		// contraction matrix: M = I + (1/gamma - 1)(v_hat x v_hat)
+		// scales by 1/gamma along velocity, leaves perpendicular unchanged
+		float f = contraction - 1.0f;  // negative — so it shrinks
+
+		contractionMatrix.r[0] = dx::XMVectorSet(1.0f + f * vx * vx, f * vx * vy, f * vx * vz, 0.0f);
+		contractionMatrix.r[1] = dx::XMVectorSet(f * vy * vx, 1.0f + f * vy * vy, f * vy * vz, 0.0f);
+		contractionMatrix.r[2] = dx::XMVectorSet(f * vz * vx, f * vz * vy, 1.0f + f * vz * vz, 0.0f);
+		contractionMatrix.r[3] = dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+	}
+
+	// contraction applied first in model space, then rotate, then translate
+	return contractionMatrix *
+		dx::XMMatrixRotationRollPitchYaw(pitch, yaw, roll) *
+		dx::XMMatrixRotationRollPitchYaw(theta, phi, chi) *
+		dx::XMMatrixTranslation(body.GetX(), body.GetY(), body.GetZ());
+}
 DirectX::XMMATRIX Sphere::GetTransformXM() const noexcept
 {
 	return DirectX::XMMatrixRotationRollPitchYaw(pitch, yaw, roll) *
 		DirectX::XMMatrixRotationRollPitchYaw(theta, phi, chi) * 
 		DirectX::XMMatrixTranslation(body.GetX(), body.GetY(), body.GetZ());
-}
-
-void Sphere::UpdatePixelColor(Graphics& gfx, DirectX::XMVECTOR Etot) noexcept
+} */
+DirectX::XMMATRIX Sphere::GetTransformXM() const noexcept
 {
-	DirectX::XMVECTOR v = Etot;
-	DirectX::XMFLOAT3 f3;
-	DirectX::XMStoreFloat3(&f3, v);
-	if (pPolarCbuf) {
-		ConstantBufferQ cb1 = {};
-		
-		cb1.polarizationDirection = f3;
-		cb1.padding=0.0f; // Ensure 16-byte alignment
-		
-		pPolarCbuf->Update(gfx, cb1);
+	namespace dx = DirectX;
+
+	float vx, vy, vz;
+	pWorld->GetVelocity(bodyIndex, vx, vy, vz);
+	float v_sq = vx * vx + vy * vy + vz * vz;
+
+	dx::XMMATRIX contractionMatrix = dx::XMMatrixIdentity();
+
+	if (v_sq > 1e-6f)
+	{
+		float gamma = pWorld->gamma[bodyIndex];
+		float contraction = 1.0f / gamma;
+		float v_mag = std::sqrt(v_sq);
+		float nvx = vx / v_mag;
+		float nvy = vy / v_mag;
+		float nvz = vz / v_mag;
+		float f = contraction - 1.0f;
+
+		contractionMatrix.r[0] = dx::XMVectorSet(1.0f + f * nvx * nvx, f * nvx * nvy, f * nvx * nvz, 0.0f);
+		contractionMatrix.r[1] = dx::XMVectorSet(f * nvy * nvx, 1.0f + f * nvy * nvy, f * nvy * nvz, 0.0f);
+		contractionMatrix.r[2] = dx::XMVectorSet(f * nvz * nvx, f * nvz * nvy, 1.0f + f * nvz * nvz, 0.0f);
+		contractionMatrix.r[3] = dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 	}
+
+	return contractionMatrix *
+		dx::XMMatrixRotationRollPitchYaw(pitch, yaw, roll) *
+		dx::XMMatrixRotationRollPitchYaw(theta, phi, chi) *
+		dx::XMMatrixTranslation(pWorld->posX[bodyIndex],
+			pWorld->posY[bodyIndex],
+			pWorld->posZ[bodyIndex]);
+}
+void Sphere::UpdatePixelColor(Graphics& gfx) noexcept
+{
+	if (!pPolarCbuf) return;
+	ConstantBufferQ cb = {};
+	cb.polarizationDirection = {
+		pWorld->eTotalX[bodyIndex],
+		pWorld->eTotalY[bodyIndex],
+		pWorld->eTotalZ[bodyIndex]
+	};
+	cb.padding = 0.0f;
+	pPolarCbuf->Update(gfx, cb);
 }
 
 void Sphere::UpdateGlow(Graphics& gfx) noexcept
 {
-	if (pGlowCbuf)
-	{
-		ConstantBufferGlow cb = {};
-		cb.glowIntensity = body.GetRadiationIntensity();
-		cb.padding[0] = cb.padding[1] = cb.padding[2] = 0.0f;
-		pGlowCbuf->Update(gfx, cb);
-	}
+	if (!pGlowCbuf) return;
+	ConstantBufferGlow cb = {};
+	cb.glowIntensity = pWorld->GetRadiationIntensity(bodyIndex);
+	pGlowCbuf->Update(gfx, cb);
 }

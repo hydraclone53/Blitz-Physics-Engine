@@ -71,6 +71,8 @@ public:
 	int GetCharge() const noexcept { return q; }
 	float GetMass() const noexcept { return mass; }
 	dx::XMVECTOR GetMomentum() noexcept;
+	float GetGamma() const noexcept { return gamma; }
+	
 	
 
 	// --- ENERGY ---
@@ -89,6 +91,7 @@ private:
 	float di = 0.0f;
 	float dj = 0.0f;
 	float dk = 0.0f;
+	float gamma = 1.0f;
 	dx::XMVECTOR prevVel = dx::XMVectorZero();
 	dx::XMVECTOR acceleration = dx::XMVectorZero();
 	// --- PROPERTIES ---
@@ -109,6 +112,7 @@ private:
 	dx::XMVECTOR externalE = dx::XMVectorZero();
 
 	void UpdatePixelColor(Graphics& gfx, DirectX::XMVECTOR Etot) noexcept;
+	//void SetGamma(float f) { gamma = f; }
 
 
 };

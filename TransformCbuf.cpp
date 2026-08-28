@@ -20,9 +20,7 @@ void TransformCbuf::Bind(Graphics& gfx) noexcept
     );
     // world matrix only — used for normal transform, no camera/projection
     // inverse transpose handles non-uniform scaling (length contraction)
-    t.world = DirectX::XMMatrixTranspose(
-        DirectX::XMMatrixInverse(nullptr, model)
-    );
+    t.world = model; ;
 
     pVcbuf->Update(gfx, t);
     pVcbuf->Bind(gfx);

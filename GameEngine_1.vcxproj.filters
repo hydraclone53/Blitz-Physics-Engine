@@ -54,7 +54,7 @@
     <Filter Include="Source Files\Skeleton\Graphics">
       <UniqueIdentifier>{b95b2665-389d-4004-b764-77b1b29d5b2e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Drawable\ImGui">
+    <Filter Include="Source Files\ImGui">
       <UniqueIdentifier>{1209ef9d-7c51-4f68-82cf-296f9ad11840}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -109,9 +109,6 @@
     </ClInclude>
     <ClInclude Include="App.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Sphere.h">
-      <Filter>Header Files\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="Keyboard.h">
       <Filter>Header Files\Skeleton\Window</Filter>
@@ -188,6 +185,18 @@
     <ClInclude Include="PhysConstants.h">
       <Filter>Header Files\Physics</Filter>
     </ClInclude>
+    <ClInclude Include="Sphere.h">
+      <Filter>Header Files\Drawable</Filter>
+    </ClInclude>
+    <ClInclude Include="SpatialHash.h">
+      <Filter>Header Files\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsWorld.h">
+      <Filter>Header Files\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="CuboidWall.h">
+      <Filter>Header Files\Drawable</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp">
@@ -245,10 +254,10 @@
       <Filter>Imgui</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
-      <Filter>Source Files\Drawable\ImGui</Filter>
+      <Filter>Source Files\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="Parameters.cpp">
-      <Filter>Source Files\Drawable\ImGui</Filter>
+      <Filter>Source Files\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="SystemForce.cpp">
       <Filter>Source Files\Physics</Filter>
@@ -263,7 +272,7 @@
       <Filter>Source Files\Drawable</Filter>
     </ClCompile>
     <ClCompile Include="ImguiManager.cpp">
-      <Filter>Source Files\Drawable\ImGui</Filter>
+      <Filter>Source Files\ImGui</Filter>
     </ClCompile>
     <ClCompile Include="Keyboard.cpp">
       <Filter>Source Files\Skeleton\Window</Filter>
@@ -291,6 +300,15 @@
     </ClCompile>
     <ClCompile Include="ChiliTimer.cpp">
       <Filter>Source Files\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="SpatialHash.cpp">
+      <Filter>Source Files\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsWorld.cpp">
+      <Filter>Source Files\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="CuboidWall.cpp">
+      <Filter>Source Files\Drawable</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
