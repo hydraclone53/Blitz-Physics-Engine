@@ -10,7 +10,7 @@
 App::App()
 	:
 	wnd(800, 800, L"epik"),
-	coulombHash(1.0f, 2048),
+	coulombHash(100.0f, 2048),
 	vdwHash(1.0f, 4096)
 	
 {
@@ -27,17 +27,24 @@ App::App()
 
 	wnd.DisableCursor();
 	
-	for (auto i = 0; i < 0; i++)
+	for (auto i = 0; i < 2; i++)
 	{
 		float x = rdist(rng), y = rdist(rng), z = rdist(rng);
 		int q = ch(rng);
 		int idx = world.Add(x, y, z, 0.0f, 0.0f, 0.0f, q, 1.0f);
 		auto pSphere = std::make_unique<Sphere>(wnd.Gfx(), world, idx,
-			adist, ddist, odist, rng);
+			adist, ddist, odist, rng,false);
+		drawables.push_back(std::move(pSphere));
+	}
+	whip.Init(world);
+	for (int idx : whip.GetTrailIndices())
+	{
+		auto pSphere = std::make_unique<Sphere>(wnd.Gfx(), world, idx,
+			adist, ddist, odist, rng, true);
 		drawables.push_back(std::move(pSphere));
 	}
 
-	wall.Spawn(world, 10.0f, 0.0f, 0.0f, 10, 10, 3, 1.0f);
+	/*wall.Spawn(world, 10.0f, 0.0f, 0.0f, 10, 10, 3, 1.0f);
 	wall.BuildBonds(world, 1.5f);  // 1.5 captures immediate + diagonal neighbors at spacing=1.0
 	for (int idx : wall.GetParticleIndices())
 	{
@@ -45,7 +52,7 @@ App::App()
 			adist, ddist, odist, rng);
 		drawables.push_back(std::move(pSphere));
 	}
-
+	*/
 	ImGui_ImplWin32_Init(wnd.GetHandle()); // Ensure you have a way to get the HWND
 	ImGui_ImplDX11_Init(wnd.Gfx().GetDevice(), wnd.Gfx().GetContext()); 
 	wnd.Gfx().SetProjection(dx::XMMatrixPerspectiveLH(1.0f, 1.0f, 0.5f, 4000.0f)); //The box
@@ -89,7 +96,7 @@ void App::ResetSimulation(int obj)
 		int q = ch(rng);
 		int idx = world.Add(x, y, z, 0.0f, 0.0f, 0.0f, q, 1.0f);
 		auto pSphere = std::make_unique<Sphere>(wnd.Gfx(), world, idx,
-			adist, ddist, odist, rng);
+			adist, ddist, odist, rng,false);
 		drawables.push_back(std::move(pSphere));
 	}
 }
@@ -115,24 +122,24 @@ void App::DoFrame()
 		auto t0 = std::chrono::high_resolution_clock::now();
 		
 		if (step % 2 == 0) {
-			/*coulombHash.BuildHash(world.posX.data(), world.posY.data(),
+			coulombHash.BuildHash(world.posX.data(), world.posY.data(),
 				world.posZ.data(), world.count);
 		
 			vdwHash.BuildHash(world.posX.data(), world.posY.data(),
-				world.posZ.data(), world.count);*/
+				world.posZ.data(), world.count);
 			coulombHash.BuildHashNoPairs(world.posX.data(), world.posY.data(),
 				world.posZ.data(), world.count);
 			vdwHash.BuildHash(world.posX.data(), world.posY.data(),
 				world.posZ.data(), world.count);  // keep full version — needs pairs
 		}
 		auto t1 = std::chrono::high_resolution_clock::now();
-		//pair.CalcCForce(world, coulombHash);
-		wall.ApplyBondForces(world,1.5f);
+		pair.CalcCForce(world, coulombHash);
+		//wall.ApplyBondForces(world,1.5f);
 		// TEMPORARY TEST — apply a strong impulse to a particle near the center of the wall
 // pick a particle index roughly in the middle of the lattice
 		//int testIdx = wall.GetParticleIndices()[150];  // adjust based on which index is central for your 10x10x3 grid
 		//wall.ApplyTestImpulse(world, testIdx, 0.0f, 0.0f, 5.0f);  // strong push in Z direction
-		//pair.CalcVandForce(world, vdwHash);
+		pair.CalcVandForce(world, vdwHash);
 		world.AddEtotalAll();
 		
 		field.CalcEPolar(world, coulombHash);
@@ -143,6 +150,8 @@ void App::DoFrame()
 		world.ResetAccumulators();
 
 		auto t3 = std::chrono::high_resolution_clock::now();
+		whip.Update(world, subDt);
+		whip.ApplyPolarizabilityBoost(world, 2.0f);
 
 		if (step == 0)
 		{
@@ -260,6 +269,39 @@ void App::HandleCamera() noexcept
 			cam.Rotate((float)delta->x, (float)delta->y);
 	}
 
+	
+	float cx = cam.GetX(), cy = cam.GetY(), cz = cam.GetZ();
+	float fx, fy, fz, rx, ry, rz, ux, uy, uz;
+	cam.GetForwardVector(fx, fy, fz);
+	cam.GetRightVector(rx, ry, rz);
+	cam.GetUpVector(ux, uy, uz);
+
+	// tune these three offsets to position the whip anywhere on screen
+	float forwardOffset = 2.0f;   // how far in front
+	float rightOffset = 1.5f;     // positive = right side of screen, negative = left
+	float upOffset = -1.5f;       // positive = higher, negative = lower
+
+	float handleOffsetX = cx + fx * forwardOffset + rx * rightOffset + ux * upOffset;
+	float handleOffsetY = cy + fy * forwardOffset + ry * rightOffset + uy * upOffset;
+	float handleOffsetZ = cz + fz * forwardOffset + rz * rightOffset + uz * upOffset;
+
+	float initialTiltAngle = 0.3491f;  // 20 degrees, tune this
+	float cosT = std::cos(initialTiltAngle);
+	float sinT = std::sin(initialTiltAngle);
+
+	// rotate (fx, fz) around the Y (up) axis by initialTiltAngle
+	float tiltedFx = fx * cosT + fz * sinT;
+	float tiltedFz = -fx * sinT + fz * cosT;
+	float tiltedFy = fy;  // unchanged — this is a horizontal-plane rotation only
+
+	whip.UpdateAim(handleOffsetX, handleOffsetY, handleOffsetZ, tiltedFx, tiltedFy, tiltedFz,rx,ry,rz);
+	
+
+	// trigger only starts the swing — direction/position already tracked by UpdateAim
+	if (wnd.kbd.KeyIsPressed('E') && !whip.IsActive())
+	{
+		whip.Trigger();
+	}
 	// upload final camera matrix to GPU
 	wnd.Gfx().SetCamera(cam.GetMatrix());
 }

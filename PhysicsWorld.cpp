@@ -16,6 +16,7 @@ int PhysicsWorld::Add(float x, float y, float z,
     M_FieldX.push_back(0.0f);  M_FieldY.push_back(0.0f);  M_FieldZ.push_back(0.0f);
     eLocalX.push_back(0.0f); eLocalY.push_back(0.0f); eLocalZ.push_back(0.0f);
     eTotalX.push_back(0.0f); eTotalY.push_back(0.0f); eTotalZ.push_back(0.0f);
+    polarizability.push_back(0.5f);
     return count++;
 }
 
@@ -32,6 +33,7 @@ void PhysicsWorld::Clear()
     M_FieldX.clear();  M_FieldY.clear();  M_FieldZ.clear();
     eLocalX.clear(); eLocalY.clear(); eLocalZ.clear();
     eTotalX.clear(); eTotalY.clear(); eTotalZ.clear();
+    polarizability.clear();
     count = 0;
 }
 
@@ -155,4 +157,19 @@ void PhysicsWorld::GetVelocity(int idx, float& vx, float& vy, float& vz) const n
     vx = uX[idx] * inv_g;
     vy = uY[idx] * inv_g;
     vz = uZ[idx] * inv_g;
+}
+
+int PhysicsWorld::TempAdd(float x, float y, float z)
+{
+    tempPosX.push_back(x);
+    tempPosY.push_back(y);
+    tempPosZ.push_back(z);
+    return (int)tempPosX.size() - 1;
+}
+
+void PhysicsWorld::TempClear()
+{
+    tempPosX.clear();
+    tempPosY.clear();
+    tempPosZ.clear();
 }

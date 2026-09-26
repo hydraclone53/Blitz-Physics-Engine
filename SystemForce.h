@@ -26,5 +26,7 @@ namespace InterForce
     {
     public:
         void ApplyLarmorDamping(float dt, PhysicsWorld& world, int idx) noexcept;
+    private:
+        float accelXholder, accelYholder, accelZholder;
     };
 }

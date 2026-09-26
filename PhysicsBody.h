@@ -37,6 +37,7 @@ public:
 	float GetY() const noexcept { return j; }
 	float GetZ() const noexcept { return k; }
 
+
 	// --- POLARIZATION ---
 	// Computes the local-space dipole direction for neutral spheres
 	// Takes the sphere's current rotation matrices so the world-space E field
@@ -97,6 +98,7 @@ private:
 	// --- PROPERTIES ---
 	float mass = 1.0f;
 	int q = 0;         // charge: -1, 0, or 1
+	std::vector<float> polarizability;
 
 	// --- FIELD QUERIES ---
 	Fields field;

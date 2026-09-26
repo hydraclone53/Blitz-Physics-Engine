@@ -162,6 +162,7 @@
     <ClInclude Include="DxgiInfoManager.h" />
     <ClInclude Include="Fields.h" />
     <ClInclude Include="Graphics.h" />
+    <ClInclude Include="Whip.h" />
     <ClInclude Include="HydraException.h" />
     <ClInclude Include="HydraWin.h" />
     <ClInclude Include="ImguiManager.h" />
@@ -230,6 +231,7 @@
     <ClCompile Include="VectorCalc.cpp" />
     <ClCompile Include="VertexBuffer.cpp" />
     <ClCompile Include="VertexShader.cpp" />
+    <ClCompile Include="Whip.cpp" />
     <ClCompile Include="Window.cpp" />
     <ClCompile Include="WinMain.cpp" />
   </ItemGroup>

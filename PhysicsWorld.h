@@ -8,6 +8,10 @@ struct PhysicsWorld
 {
     // --- POSITION ---
     std::vector<float> posX, posY, posZ;
+    std::vector<float> tempPosX, tempPosY, tempPosZ;
+
+    int TempAdd(float x, float y, float z);
+    void TempClear();
 
     // --- MOMENTUM (u = γv) ---
     std::vector<float> uX, uY, uZ;
@@ -20,6 +24,7 @@ struct PhysicsWorld
     // --- PROPERTIES ---
     std::vector<float> mass;
     std::vector<int>   charge;
+    std::vector<float> polarizability;
 
     // --- FORCE ACCUMULATORS ---
     std::vector<float> forceX, forceY, forceZ;

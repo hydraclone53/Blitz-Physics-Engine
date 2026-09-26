@@ -59,7 +59,7 @@ void InterForce::PairForce::CalcCForce(PhysicsWorld& world, SpatialHash& hash)
 
 void InterForce::PairForce::CalcVandForce(PhysicsWorld& world, SpatialHash& hash)
 {
-    constexpr float sigma = 1.0f;
+    constexpr float sigma = 1.0f ;
     constexpr float epsilon = 2.0f;
     constexpr float r_min_sq = 0.36f;
     constexpr float sigma_sq = sigma * sigma;
@@ -93,9 +93,9 @@ void InterForce::FieldForce::CalcEPolar(PhysicsWorld& world, SpatialHash& hash)
     {
         if (world.charge[j] != 0) continue;
 
-        float px = world.eTotalX[j] * 0.05f;
-        float py = world.eTotalY[j] * 0.05f;
-        float pz = world.eTotalZ[j] * 0.05f;
+        float px = world.eTotalX[j] * world.polarizability[j];
+        float py = world.eTotalY[j] * world.polarizability[j];
+        float pz = world.eTotalZ[j] * world.polarizability[j];
 
         float jx = world.posX[j], jy = world.posY[j], jz = world.posZ[j];
 
@@ -143,6 +143,8 @@ void InterForce::RadiationForce::ApplyLarmorDamping(float dt,
     float b = PhysConst::GetB();
     float q2 = (float)(world.charge[idx] * world.charge[idx]);
 
+    accelXholder = world.accelX[idx];
+    //jerkX = (world.accelX[idx] - accelXholder) / dt;
     world.forceX[idx] -= world.accelX[idx] * q2 * b;
     world.forceY[idx] -= world.accelY[idx] * q2 * b;
     world.forceZ[idx] -= world.accelZ[idx] * q2 * b;

@@ -16,11 +16,13 @@ public:
 		std::uniform_real_distribution<float>& adist,
 		std::uniform_real_distribution<float>& ddist,
 		std::uniform_real_distribution<float>& odist,
-		std::mt19937& rng);
+		std::mt19937& rng,
+		bool isTempPosition);
 
 	void Update(float dt) noexcept override;
 	DirectX::XMMATRIX GetTransformXM() const noexcept override;
 	void Draw(Graphics& gfx) const noexcept(!IS_DEBUG);
+	bool useTempPosition = false;
 
 
 

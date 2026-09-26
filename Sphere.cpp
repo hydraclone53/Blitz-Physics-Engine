@@ -12,13 +12,15 @@ Sphere::Sphere(Graphics& gfx,
 	std::uniform_real_distribution<float>& adist,
 	std::uniform_real_distribution<float>& ddist,
 	std::uniform_real_distribution<float>& odist,
-	std::mt19937& rng)
+	std::mt19937& rng,
+	bool isTempPosition)
 	:
 	
 	pGfx(&gfx),
 	pWorld(&world),
 	bodyIndex(bodyIndex),
-	q(world.charge[bodyIndex]),
+	useTempPosition(isTempPosition),
+	q(isTempPosition ? 0 : world.charge[bodyIndex]),
 	r(1.0f),
 	droll(ddist(rng)),
 	dpitch(ddist(rng)),
@@ -190,7 +192,7 @@ void Sphere::Update(float dt) noexcept
 	chi += 0.0f; // dchi* dt;
 
 	namespace dx = DirectX;
-
+	if (useTempPosition) return;
 	// update polarization shader for neutral spheres
 	if (q == 0)
 		UpdatePixelColor(*pGfx);
@@ -243,7 +245,7 @@ DirectX::XMMATRIX Sphere::GetTransformXM() const noexcept
 	return DirectX::XMMatrixRotationRollPitchYaw(pitch, yaw, roll) *
 		DirectX::XMMatrixRotationRollPitchYaw(theta, phi, chi) * 
 		DirectX::XMMatrixTranslation(body.GetX(), body.GetY(), body.GetZ());
-} */
+} 
 DirectX::XMMATRIX Sphere::GetTransformXM() const noexcept
 {
 	namespace dx = DirectX;
@@ -276,6 +278,54 @@ DirectX::XMMATRIX Sphere::GetTransformXM() const noexcept
 		dx::XMMatrixTranslation(pWorld->posX[bodyIndex],
 			pWorld->posY[bodyIndex],
 			pWorld->posZ[bodyIndex]);
+}*/
+DirectX::XMMATRIX Sphere::GetTransformXM() const noexcept
+{
+	namespace dx = DirectX;
+
+	float px, py, pz;
+	if (useTempPosition)
+	{
+		px = pWorld->tempPosX[bodyIndex];
+		py = pWorld->tempPosY[bodyIndex];
+		pz = pWorld->tempPosZ[bodyIndex];
+	}
+	else
+	{
+		px = pWorld->posX[bodyIndex];
+		py = pWorld->posY[bodyIndex];
+		pz = pWorld->posZ[bodyIndex];
+	}
+
+	dx::XMMATRIX contractionMatrix = dx::XMMatrixIdentity();
+
+	if (!useTempPosition)
+	{
+		float vx, vy, vz;
+		pWorld->GetVelocity(bodyIndex, vx, vy, vz);
+		float v_sq = vx * vx + vy * vy + vz * vz;
+
+		if (v_sq > 1e-6f)
+		{
+			float gamma = pWorld->gamma[bodyIndex];
+			float contraction = 1.0f / gamma;
+			float v_mag = std::sqrt(v_sq);
+			float nvx = vx / v_mag;
+			float nvy = vy / v_mag;
+			float nvz = vz / v_mag;
+			float f = contraction - 1.0f;
+
+			contractionMatrix.r[0] = dx::XMVectorSet(1.0f + f * nvx * nvx, f * nvx * nvy, f * nvx * nvz, 0.0f);
+			contractionMatrix.r[1] = dx::XMVectorSet(f * nvy * nvx, 1.0f + f * nvy * nvy, f * nvy * nvz, 0.0f);
+			contractionMatrix.r[2] = dx::XMVectorSet(f * nvz * nvx, f * nvz * nvy, 1.0f + f * nvz * nvz, 0.0f);
+			contractionMatrix.r[3] = dx::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+		}
+	}
+
+	return contractionMatrix *
+		dx::XMMatrixRotationRollPitchYaw(pitch, yaw, roll) *
+		dx::XMMatrixRotationRollPitchYaw(theta, phi, chi) *
+		dx::XMMatrixTranslation(px, py, pz);
 }
 void Sphere::UpdatePixelColor(Graphics& gfx) noexcept
 {

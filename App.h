@@ -11,6 +11,7 @@
 #include "SpatialHash.h"
 #include "PhysicsWorld.h"
 #include "CuboidWall.h"
+#include "Whip.h"
 
 class App
 {
@@ -34,6 +35,7 @@ private:
 	std::uniform_int_distribution<int> ch;
 	Window wnd;
 	Camera cam;
+	Whip whip;
 	Parameters par;
 	CuboidWall wall;
 

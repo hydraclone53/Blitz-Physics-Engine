@@ -85,3 +85,56 @@ void Camera::Translate(DirectX::XMFLOAT3 translation) noexcept
 		pos.z + translation.z
 	};
 }
+
+void Camera::GetForwardVector(float& fx, float& fy, float& fz) const noexcept
+{
+	namespace dx = DirectX;
+
+	const dx::XMVECTOR forwardBaseVector = dx::XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f);
+	const auto lookVector = dx::XMVector3Transform(forwardBaseVector,
+		dx::XMMatrixRotationRollPitchYaw(pitch, yaw, 0.0f)
+	);
+
+	dx::XMFLOAT3 result;
+	dx::XMStoreFloat3(&result, lookVector);
+	fx = result.x;
+	fy = result.y;
+	fz = result.z;
+}
+
+void Camera::GetRightVector(float& rx, float& ry, float& rz) const noexcept
+{
+	namespace dx = DirectX;
+
+	float fx, fy, fz;
+	GetForwardVector(fx, fy, fz);
+
+	// right = forward x worldUp
+	dx::XMVECTOR forward = dx::XMVectorSet(fx, fy, fz, 0.0f);
+	dx::XMVECTOR worldUp = dx::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	dx::XMVECTOR right = dx::XMVector3Cross(worldUp, forward);
+	right = dx::XMVector3Normalize(right);
+
+	dx::XMFLOAT3 result;
+	dx::XMStoreFloat3(&result, right);
+	rx = result.x; ry = result.y; rz = result.z;
+}
+
+void Camera::GetUpVector(float& ux, float& uy, float& uz) const noexcept
+{
+	namespace dx = DirectX;
+
+	float fx, fy, fz, rx, ry, rz;
+	GetForwardVector(fx, fy, fz);
+	GetRightVector(rx, ry, rz);
+
+	// up = forward x right (or right x forward depending on handedness — verify visually)
+	dx::XMVECTOR forward = dx::XMVectorSet(fx, fy, fz, 0.0f);
+	dx::XMVECTOR right = dx::XMVectorSet(rx, ry, rz, 0.0f);
+	dx::XMVECTOR up = dx::XMVector3Cross(forward, right);
+	up = dx::XMVector3Normalize(up);
+
+	dx::XMFLOAT3 result;
+	dx::XMStoreFloat3(&result, up);
+	ux = result.x; uy = result.y; uz = result.z;
+}
