@@ -27,6 +27,7 @@ private:
 private:
 	int x = 0, y = 0;
 	int obj = 1; // for imgui
+	
 	std::mt19937 rng(std::random_device);
 	std::uniform_real_distribution<float> adist;
 	std::uniform_real_distribution<float> ddist;
@@ -45,6 +46,7 @@ private:
 	ImguiManager  imgui;
 	bool show_demo_window = true;
 	float speed_factor = 1.0f;
+	float M_total;
 	ChiliTimer timer;
 	InterForce::PairForce pair;
 	InterForce::FieldForce field;

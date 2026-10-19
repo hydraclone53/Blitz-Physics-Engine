@@ -22,7 +22,7 @@ dx::XMFLOAT3 Fields::GetEfield(float X,float Y,float Z) noexcept {
 
  dx::XMFLOAT3 Fields::GetMfield(float X, float Y, float Z) noexcept
  {
-	 M = { 0.0f,0.0f,0.0f };
+	 M = { 0.0f,10.0f,0.0f };
 	 return M;
  }
 

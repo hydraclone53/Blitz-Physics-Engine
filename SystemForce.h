@@ -26,6 +26,10 @@ namespace InterForce
     {
     public:
         void ApplyLarmorDamping(float dt, PhysicsWorld& world, int idx) noexcept;
+        void RetardationFields(PhysicsWorld& world,float subDt) noexcept;
+        bool ProbeE(const PhysicsWorld& world, int j,
+            float px, float py, float pz, double T,
+            float& Ex, float& Ey, float& Ez) const noexcept;
     private:
         float accelXholder, accelYholder, accelZholder;
     };

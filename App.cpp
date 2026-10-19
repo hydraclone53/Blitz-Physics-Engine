@@ -11,7 +11,7 @@ App::App()
 	:
 	wnd(800, 800, L"epik"),
 	coulombHash(100.0f, 2048),
-	vdwHash(1.0f, 4096)
+	vdwHash(10.0f, 4096)
 	
 {
 	
@@ -90,15 +90,19 @@ void App::ResetSimulation(int obj)
 	std::uniform_real_distribution<float> rdist(-5.0f, 5.0f);
 	std::uniform_int_distribution<int> ch(-1, 1);
 
-	for (auto i = 0; i < obj; i++)
-	{
+	//for (auto i = 0; i < obj; i++)
+	//{
 		float x = rdist(rng), y = rdist(rng), z = rdist(rng);
 		int q = ch(rng);
-		int idx = world.Add(x, y, z, 0.0f, 0.0f, 0.0f, q, 1.0f);
+		int idx = world.Add(-8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 1.0f);
+		int idx2 = world.Add(8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1, 1.0f);
 		auto pSphere = std::make_unique<Sphere>(wnd.Gfx(), world, idx,
 			adist, ddist, odist, rng,false);
+		auto pSphere2 = std::make_unique<Sphere>(wnd.Gfx(), world, idx2,
+			adist, ddist, odist, rng, false);
 		drawables.push_back(std::move(pSphere));
-	}
+		drawables.push_back(std::move(pSphere2));
+	//}
 }
 
 void App::DoFrame()
@@ -107,6 +111,7 @@ void App::DoFrame()
 	auto dt = timer.Mark() * speed_factor;
 	constexpr float MAX_DT = 0.005f;      // physics ceiling
 	constexpr int MAX_SUBSTEPS = 10;
+
 
 	float physicsDt = std::min(dt, MAX_DT * MAX_SUBSTEPS); // don't spiral if frame hiccups
 	int nSubsteps = static_cast<int>(std::ceil(physicsDt / MAX_DT));
@@ -119,6 +124,7 @@ void App::DoFrame()
 	
 	for (int step = 0; step < nSubsteps; ++step)
 	{
+		world.total_time += subDt;
 		auto t0 = std::chrono::high_resolution_clock::now();
 		
 		if (step % 2 == 0) {
@@ -133,22 +139,57 @@ void App::DoFrame()
 				world.posZ.data(), world.count);  // keep full version — needs pairs
 		}
 		auto t1 = std::chrono::high_resolution_clock::now();
-		pair.CalcCForce(world, coulombHash);
+		//pair.CalcCForce(world, coulombHash);
 		//wall.ApplyBondForces(world,1.5f);
 		// TEMPORARY TEST — apply a strong impulse to a particle near the center of the wall
-// pick a particle index roughly in the middle of the lattice
+		// pick a particle index roughly in the middle of the lattice
 		//int testIdx = wall.GetParticleIndices()[150];  // adjust based on which index is central for your 10x10x3 grid
 		//wall.ApplyTestImpulse(world, testIdx, 0.0f, 0.0f, 5.0f);  // strong push in Z direction
-		pair.CalcVandForce(world, vdwHash);
+		//pair.CalcVandForce(world, vdwHash);
+		rad.RetardationFields(world,subDt);
+		if (step == 0)
+		{
+			ImGui::Begin("Field debug");
+			ImGui::Text("count: %d", world.count);
+
+			if (world.count >= 2)
+			{
+				float dx = world.posX[1] - world.posX[0];
+				float dy = world.posY[1] - world.posY[0];
+				float dz = world.posZ[1] - world.posZ[0];
+				float r = std::sqrt(dx * dx + dy * dy + dz * dz);
+				ImGui::Text("sep: %.3f", r);
+
+				if (r > 1e-6f)
+				{
+					float Erad = (world.E_FieldX[0] * dx + world.E_FieldY[0] * dy + world.E_FieldZ[0] * dz) / r;
+					float Frad = world.charge[0] * Erad;
+					float s = r * r + 1.5f;
+					float Fcoul = -PhysConst::GetK() * world.charge[0] * world.charge[1] * r / (s * std::sqrt(s));
+					ImGui::Text("retarded F toward other: %.4f", Frad);
+					ImGui::Text("coulomb  F toward other: %.4f", Fcoul);
+				}
+			}
+			ImGui::End();
+		}
 		world.AddEtotalAll();
 		
 		field.CalcEPolar(world, coulombHash);
-		for (int i = 0; i < world.count; i++)
-			rad.ApplyLarmorDamping(subDt, world, i);
+		float Mx = 0.0f, My = 0.0f, Mz = 0.0f, mx, my, mz;
+		for (int i = 0; i < world.count; i++) {
+			world.GetMomentum(i, mx, my, mz);
+			Mx += mx;
+			My += my;
+			Mz += mz;
+		}
+		float Msq = Mx * Mx + My * My + Mz * Mz;
+		M_total = std::sqrt(Msq);
+		
+			//rad.ApplyLarmorDamping(subDt, world, i);
 		auto t2 = std::chrono::high_resolution_clock::now();
 		world.StepAllBoris(subDt);
 		world.ResetAccumulators();
-
+		
 		auto t3 = std::chrono::high_resolution_clock::now();
 		whip.Update(world, subDt);
 		whip.ApplyPolarizabilityBoost(world, 2.0f);
@@ -179,6 +220,13 @@ void App::DoFrame()
 		}
 	}
 
+	float ex, ey, ez;
+	bool ok = rad.ProbeE(world, 1, world.posX[1] + 4.0f, world.posY[1], world.posZ[1],
+						 world.total_time, ex, ey, ez);
+	float den = 4.0f * 4.0f + 1.5f;
+	ImGui::Text("probe ok=%d  Ex=%.4f  coulomb=%.4f", ok, ex,
+				PhysConst::GetK() * world.charge[1] * 4.0f / (den * std::sqrt(den)));
+
 	// momentum readout after all substeps
 	
 	for (auto& d : drawables)
@@ -200,7 +248,7 @@ void App::DoFrame()
 		
 
 	std::wostringstream oss;
-	oss << L"Big Box ";// << TotalMomentumMag; // << L", Total Energy: " << energy;
+	oss << L"Big Box " << M_total; // << L", Total Energy: " << energy;
 	wnd.SetTitle(oss.str());
 	
 	while (!wnd.kbd.KeyIsEmpty())

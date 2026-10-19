@@ -20,7 +20,7 @@ namespace PhysConst
     // Polarization
 
     // Speed of light
-    inline float c = 100.0f;  // non-constexpr — runtime tunable
+    inline float c = 300.0f;  // non-constexpr — runtime tunable
     inline float gamma = 1.0f;
 
     // Larmor damping — derived, not arbitrary
