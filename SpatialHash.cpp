@@ -263,6 +263,5 @@ void SpatialHash::BuildHashNoPairs(const float* posX, const float* posY,
         entries[i] = { i, cx, cy, cz, buckets[h] };
         buckets[h] = i;
     }
-    // no cellCount/cellStart/sortedEntries/pairs work needed —
-    // QueryNeighbors only needs buckets+entries, not the pair list
+
 }

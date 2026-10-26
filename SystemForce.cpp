@@ -59,12 +59,12 @@ void InterForce::PairForce::CalcCForce(PhysicsWorld& world, SpatialHash& hash)
 
 void InterForce::PairForce::CalcVandForce(PhysicsWorld& world, SpatialHash& hash)
 {
-    constexpr float sigma = 4.0f ;
+    constexpr float sigma = 1.0f ;
     constexpr float epsilon = 2.0f;
-    constexpr float r_min_sq = 5.76f;//0.36f;
+    constexpr float r_min_sq = 0.36f;
     constexpr float sigma_sq = sigma * sigma;
 
-    for (auto& p : hash.pairs)  // iterate flat pair list — no hash lookups
+    for (auto& p : hash.pairs)  // iterate pair list 
     {
         int a = p.a, b = p.b;
 
@@ -133,7 +133,7 @@ void InterForce::FieldForce::CalcEPolar(PhysicsWorld& world, SpatialHash& hash)
         }
     }
 }
-
+//Wrong formula. Uses acceleration instead of jerk. Jerk gives too much error.
 void InterForce::RadiationForce::ApplyLarmorDamping(float dt,
     PhysicsWorld& world,
     int idx) noexcept
@@ -167,7 +167,7 @@ void InterForce::RadiationForce::RetardationFields(PhysicsWorld& world, float dt
             {
                 int count = 0;
                 const auto& h = world.retar[j];
-                if (h.r_time.empty()) continue;          // no history yet: skip this source
+                if (h.r_time.empty()) continue;          // no history yet
 
                 double rX1 = world.posX[k] - h.r_wX[0];
                 double rY1 = world.posY[k] - h.r_wY[0];
@@ -242,13 +242,16 @@ void InterForce::RadiationForce::RetardationFields(PhysicsWorld& world, float dt
                 float Z = V * Uz + Rx * cy - Ry * cx;
 
                 float constant = k_const * world.charge[j] * R / (D * D * D) * soften;
-                world.E_FieldX[k] += constant * X;
-                world.E_FieldY[k] += constant * Y;
-                world.E_FieldZ[k] += constant * Z;
+                float Ex = constant * X;
+                float Ey = constant * Y;
+                float Ez = constant * Z;
+                world.E_FieldX[k] += Ex;
+                world.E_FieldY[k] += Ey;
+                world.E_FieldZ[k] += Ez;
 
-                // world.M_FieldX[k] += (uRy * Ez - uRz * Ey) / c;
-                // world.M_FieldY[k] += (uRz * Ex - uRx * Ez) / c;
-                // world.M_FieldZ[k] += (uRx * Ey - uRy * Ex) / c;  
+                world.M_FieldX[k] += (uRy * Ez - uRz * Ey) / c;
+                world.M_FieldY[k] += (uRz * Ex - uRx * Ez) / c;
+                world.M_FieldZ[k] += (uRx * Ey - uRy * Ex) / c;  
             }
         }
     }
@@ -256,7 +259,7 @@ void InterForce::RadiationForce::RetardationFields(PhysicsWorld& world, float dt
 
 
 // Retarded E of source j alone, at point P, at time T.
-// Returns false if j is neutral or its signal hasn't reached P yet.
+// Returns false if j is neutral or its signal hasn't reached P yet. Basically ignores neutral spheres
 bool InterForce::RadiationForce::ProbeE(const PhysicsWorld& world, int j,
     float px, float py, float pz, double T,
     float& Ex, float& Ey, float& Ez) const noexcept
@@ -272,7 +275,7 @@ bool InterForce::RadiationForce::ProbeE(const PhysicsWorld& world, int j,
     const float c_sq = c * c;
     const float k_const = PhysConst::GetK();
 
-    // gap(i) = distance(P, row i) - light travel since row i.   <= 0 means row i has arrived
+    // gap(i) = distance(P, row i) - light travel since row i. 0 means row i has arrived
     auto gap = [&](int i) -> double
         {
             double dx = (double)px - h.r_wX[i];
@@ -283,7 +286,7 @@ bool InterForce::RadiationForce::ProbeE(const PhysicsWorld& world, int j,
 
     if (gap(0) > 0.0) return false;           // the signal hasn't reached P at all yet
 
-    // binary search for the first row still in flight (gap > 0); row 0 is known to have arrived
+    // binary search for the first row yet to arrive (gap > 0); row 0 is known to have arrived
     int lo = 1, hi = rows;
     while (lo < hi)
     {
@@ -291,7 +294,7 @@ bool InterForce::RadiationForce::ProbeE(const PhysicsWorld& world, int j,
         if (gap(mid) > 0.0) hi = mid;
         else                lo = mid + 1;
     }
-    // lo = first in-flight row, or rows if there is none
+    // lo = first nearby row has yet to arrive
 
     int r = lo - 1;                           // last row that has arrived
     float f = 0.0f;
@@ -315,7 +318,7 @@ bool InterForce::RadiationForce::ProbeE(const PhysicsWorld& world, int j,
     float R = std::sqrt(Rx * Rx + Ry * Ry + Rz * Rz);
     if (R < 1e-6f) return false;
 
-    // softening from the PRESENT separation, same as RetardationFields
+    //same as RetardationFields
     float pdx = px - world.posX[j];
     float pdy = py - world.posY[j];
     float pdz = pz - world.posZ[j];

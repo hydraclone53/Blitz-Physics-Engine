@@ -200,6 +200,9 @@
     <ClInclude Include="Whip.h">
       <Filter>Header Files\Physics</Filter>
     </ClInclude>
+    <ClInclude Include="FieldLines.h">
+      <Filter>Header Files\Physics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp">
@@ -316,6 +319,9 @@
     <ClCompile Include="Whip.cpp">
       <Filter>Source Files\Physics</Filter>
     </ClCompile>
+    <ClCompile Include="FieldLines.cpp">
+      <Filter>Source Files\Physics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="VertexShader.hlsl">
@@ -325,6 +331,12 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="PixelShader1.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="LineVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="LinePS.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

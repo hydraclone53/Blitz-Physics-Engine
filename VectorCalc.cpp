@@ -1,7 +1,8 @@
+//Still in progress. Havent figured out how to code in Divergent and Curl as functions.
 #include "VectorCalc.h"
 #include "Graphics.h"
 #include <sstream>
-
+//can use this function for dipole
 dx::XMVECTOR vector::CalcGrad(std::function<float(float, float, float)> field, float x, float y, float z, float h)
 {
     float dfdx = (field(x + h, y, z) - field(x - h, y, z)) / (2.0f * h);
@@ -14,5 +15,6 @@ dx::XMVECTOR vector::CalcGrad(std::function<float(float, float, float)> field, f
 
 float vector::CalcDiv(dx::XMVECTOR vec)
 {
+
     return 0.0f;
 }

@@ -12,6 +12,7 @@
 #include "PhysicsWorld.h"
 #include "CuboidWall.h"
 #include "Whip.h"
+#include "FieldLines.h"
 
 class App
 {
@@ -39,6 +40,7 @@ private:
 	Whip whip;
 	Parameters par;
 	CuboidWall wall;
+	FieldLines fieldLines;
 
 	SpatialHash coulombHash;
 	SpatialHash vdwHash;

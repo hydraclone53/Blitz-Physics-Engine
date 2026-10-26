@@ -94,14 +94,19 @@ void App::ResetSimulation(int obj)
 	//{
 		float x = rdist(rng), y = rdist(rng), z = rdist(rng);
 		int q = ch(rng);
-		int idx = world.Add(-8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 1.0f);
-		int idx2 = world.Add(8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1, 1.0f);
+		int idx = world.Add(0.0f, 0.0f, 0.0f, 40.0f, 0.0f, 0.0f, 1, 0.2f);
+		//int idx = world.Add(-3.0f, 0.0f, 0.0f, 0.0f, 80.0f, 0.0f, 1, 1.0f);
+		int idx2 = world.Add(8.0f, -18.5f, 0.0f, 40.0f, 40.0f, 0.0f, -1, 1.0f);
+		// int idx2 = world.Add(3.0f, 0.0f, 0.0f, 0.0f, 80.0f, 0.0f, -1, 1.0f);
+		//int idx3 = world.Add(0.0f, 8.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1, 1.0f);
 		auto pSphere = std::make_unique<Sphere>(wnd.Gfx(), world, idx,
 			adist, ddist, odist, rng,false);
 		auto pSphere2 = std::make_unique<Sphere>(wnd.Gfx(), world, idx2,
 			adist, ddist, odist, rng, false);
+		//auto pSphere3 = std::make_unique<Sphere>(wnd.Gfx(), world, idx3,adist, ddist, odist, rng, false);
 		drawables.push_back(std::move(pSphere));
 		drawables.push_back(std::move(pSphere2));
+		//drawables.push_back(std::move(pSphere3));
 	//}
 }
 
@@ -136,7 +141,7 @@ void App::DoFrame()
 			coulombHash.BuildHashNoPairs(world.posX.data(), world.posY.data(),
 				world.posZ.data(), world.count);
 			vdwHash.BuildHash(world.posX.data(), world.posY.data(),
-				world.posZ.data(), world.count);  // keep full version — needs pairs
+				world.posZ.data(), world.count);  
 		}
 		auto t1 = std::chrono::high_resolution_clock::now();
 		//pair.CalcCForce(world, coulombHash);
@@ -168,6 +173,9 @@ void App::DoFrame()
 					float Fcoul = -PhysConst::GetK() * world.charge[0] * world.charge[1] * r / (s * std::sqrt(s));
 					ImGui::Text("retarded F toward other: %.4f", Frad);
 					ImGui::Text("coulomb  F toward other: %.4f", Fcoul);
+					ImGui::Text("t: %.3f", world.total_time);
+					ImGui::Text("accelX[0]: %.4f   ratio: %.4f", world.accelX[0], std::fabs(world.accelX[0]) / std::fabs(Fcoul));
+					ImGui::Text("Bz[0]: %.5f", world.M_FieldZ[0]);
 				}
 			}
 			ImGui::End();
@@ -226,6 +234,8 @@ void App::DoFrame()
 	float den = 4.0f * 4.0f + 1.5f;
 	ImGui::Text("probe ok=%d  Ex=%.4f  coulomb=%.4f", ok, ex,
 				PhysConst::GetK() * world.charge[1] * 4.0f / (den * std::sqrt(den)));
+	fieldLines.Update(world, rad, 1);     // sphere idx 1
+	fieldLines.Controls();
 
 	// momentum readout after all substeps
 	
@@ -234,6 +244,7 @@ void App::DoFrame()
 
 		d->Draw(wnd.Gfx());
 	}
+	//fieldLines.Draw(wnd.Gfx());
 	obj = par.ResetSim(obj);
 
 	static char buffer[1024];

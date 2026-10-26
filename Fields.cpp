@@ -1,3 +1,5 @@
+//Add artificial fields for tests.
+
 #include "Fields.h"
 #include "BindableBase.h"
 #include "Define.h"
