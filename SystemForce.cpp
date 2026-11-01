@@ -93,9 +93,9 @@ void InterForce::FieldForce::CalcEPolar(PhysicsWorld& world, SpatialHash& hash)
     {
         if (world.charge[j] != 0) continue;
 
-        float px = world.eTotalX[j] * world.polarizability[j];
-        float py = world.eTotalY[j] * world.polarizability[j];
-        float pz = world.eTotalZ[j] * world.polarizability[j];
+        float px = world.eTotalX[j] * world.polarizability[j] * PhysConst::Getpermit_of_freespace() * 1400;
+        float py = world.eTotalY[j] * world.polarizability[j] * PhysConst::Getpermit_of_freespace() * 1400;
+        float pz = world.eTotalZ[j] * world.polarizability[j] * PhysConst::Getpermit_of_freespace() * 1400;
 
         float jx = world.posX[j], jy = world.posY[j], jz = world.posZ[j];
 
@@ -141,20 +141,49 @@ void InterForce::RadiationForce::ApplyLarmorDamping(float dt,
     if (world.charge[idx] == 0) return;
 
     float b = PhysConst::GetB();
-    float q2 = (float)(world.charge[idx] * world.charge[idx]);
+    float q_sq = (float)(world.charge[idx] * world.charge[idx]);
+    float gam = world.gamma[idx];
+    float gam_six = gam * gam * gam * gam * gam * gam;
+    float c = PhysConst::GetC();
 
-    accelXholder = world.accelX[idx];
-    //jerkX = (world.accelX[idx] - accelXholder) / dt;
-    world.forceX[idx] -= world.accelX[idx] * q2 * b;
-    world.forceY[idx] -= world.accelY[idx] * q2 * b;
-    world.forceZ[idx] -= world.accelZ[idx] * q2 * b;
+
+    float aX = world.accelX[idx];
+    float aY = world.accelY[idx];
+    float aZ = world.accelZ[idx];
+    float a_sq = aX * aX + aY * aY * aZ * aZ;
+
+    float vX = world.uX[idx] / gam;
+    float vY = world.uY[idx] / gam;
+    float vZ = world.uZ[idx] / gam;
+    float V = vX * vX + vY * vY + vZ * vZ;
+    float vX_mag = vX / V;
+    float vY_mag = vY / V;
+    float vZ_mag = vZ / V;
+
+    float crossX = vY * aZ;
+    float crossY = -vZ * aX;
+    float crossZ = vX * aY;
+    float cross = std::sqrt(crossX * crossX + crossY * crossY + crossZ * crossZ)/c;
+    float cross_sq = cross * cross;
+    float power = b * q_sq * gam_six * (a_sq - cross_sq);
+
+    float fX = world.forceX[idx] -= power * vX_mag;
+    float fY = world.forceY[idx];
+    float fZ = world.forceZ[idx];
+
+    float dot = fX * vX + fY * vY + fZ * vZ;
+    float costheta = power / dot;
+    float sintheta = std::sqrt(1 - costheta * costheta);
+
+
+
 }
 float lerp(float a, float b, float f) {
     return a + f * (b - a);
 }
 void InterForce::RadiationForce::RetardationFields(PhysicsWorld& world, float dt) noexcept
 {
-    const float c = PhysConst::c;
+    const float c = PhysConst::GetC();
     const float c_sq = c * c;
     const float k_const = PhysConst::GetK();
     const double T = world.total_time - (double)dt;
@@ -271,7 +300,7 @@ bool InterForce::RadiationForce::ProbeE(const PhysicsWorld& world, int j,
     const int rows = (int)h.r_time.size();
     if (rows == 0) return false;
 
-    const float c = PhysConst::c;
+    const float c = PhysConst::GetC();
     const float c_sq = c * c;
     const float k_const = PhysConst::GetK();
 

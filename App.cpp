@@ -22,12 +22,12 @@ App::App()
 	std::uniform_real_distribution<float> adist(0.0f, 3.1415f * 2.0f);
 	std::uniform_real_distribution<float> ddist(0.0f, 3.1415f * 2.0f);
 	std::uniform_real_distribution<float> odist(0.0f, 3.1415f * 0.3f);
-	std::uniform_real_distribution<float> rdist(-15.0f, 15.0f);
+	std::uniform_real_distribution<float> rdist(-10.0f, 10.0f);
 	std::uniform_int_distribution<int> ch( -1,1);
 
 	wnd.DisableCursor();
 	
-	for (auto i = 0; i < 2; i++)
+	for (auto i = 0; i < 2;i++)
 	{
 		float x = rdist(rng), y = rdist(rng), z = rdist(rng);
 		int q = ch(rng);
@@ -94,20 +94,33 @@ void App::ResetSimulation(int obj)
 	//{
 		float x = rdist(rng), y = rdist(rng), z = rdist(rng);
 		int q = ch(rng);
-		int idx = world.Add(0.0f, 0.0f, 0.0f, 40.0f, 0.0f, 0.0f, 1, 0.2f);
-		//int idx = world.Add(-3.0f, 0.0f, 0.0f, 0.0f, 80.0f, 0.0f, 1, 1.0f);
-		int idx2 = world.Add(8.0f, -18.5f, 0.0f, 40.0f, 40.0f, 0.0f, -1, 1.0f);
-		// int idx2 = world.Add(3.0f, 0.0f, 0.0f, 0.0f, 80.0f, 0.0f, -1, 1.0f);
-		//int idx3 = world.Add(0.0f, 8.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1, 1.0f);
+		int idx = world.Add(-8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1, 1.0f);
+		int idx2 = world.Add(8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 1.0f);
+		/*
+		int idx = world.Add(-3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1, 1.0f);
+		 int idx2 = world.Add(3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1, 1.0f);
+		int idx3 = world.Add(3.0f, 6.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1, 1.0f);
+		int idx4 = world.Add(-3.0f, 6.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1, 1.0f);
+		auto pSphere3 = std::make_unique<Sphere>(wnd.Gfx(), world, idx3,adist, ddist, odist, rng, false);
+		auto pSphere4 = std::make_unique<Sphere>(wnd.Gfx(), world, idx4, adist, ddist, odist, rng, false); */
 		auto pSphere = std::make_unique<Sphere>(wnd.Gfx(), world, idx,
+
 			adist, ddist, odist, rng,false);
 		auto pSphere2 = std::make_unique<Sphere>(wnd.Gfx(), world, idx2,
 			adist, ddist, odist, rng, false);
-		//auto pSphere3 = std::make_unique<Sphere>(wnd.Gfx(), world, idx3,adist, ddist, odist, rng, false);
+		
 		drawables.push_back(std::move(pSphere));
 		drawables.push_back(std::move(pSphere2));
 		//drawables.push_back(std::move(pSphere3));
+		//drawables.push_back(std::move(pSphere4));
 	//}
+		whip.Init(world);
+		for (int idx : whip.GetTrailIndices())
+		{
+			auto pSphere = std::make_unique<Sphere>(wnd.Gfx(), world, idx,
+				adist, ddist, odist, rng, true);
+			drawables.push_back(std::move(pSphere));
+		}
 }
 
 void App::DoFrame()
@@ -144,14 +157,12 @@ void App::DoFrame()
 				world.posZ.data(), world.count);  
 		}
 		auto t1 = std::chrono::high_resolution_clock::now();
-		//pair.CalcCForce(world, coulombHash);
+		pair.CalcCForce(world, coulombHash);
 		//wall.ApplyBondForces(world,1.5f);
-		// TEMPORARY TEST — apply a strong impulse to a particle near the center of the wall
-		// pick a particle index roughly in the middle of the lattice
-		//int testIdx = wall.GetParticleIndices()[150];  // adjust based on which index is central for your 10x10x3 grid
+		//int testIdx = wall.GetParticleIndices()[150]; 
 		//wall.ApplyTestImpulse(world, testIdx, 0.0f, 0.0f, 5.0f);  // strong push in Z direction
 		//pair.CalcVandForce(world, vdwHash);
-		rad.RetardationFields(world,subDt);
+		//rad.RetardationFields(world,subDt);
 		if (step == 0)
 		{
 			ImGui::Begin("Field debug");
@@ -183,15 +194,18 @@ void App::DoFrame()
 		world.AddEtotalAll();
 		
 		field.CalcEPolar(world, coulombHash);
-		float Mx = 0.0f, My = 0.0f, Mz = 0.0f, mx, my, mz;
+		float Mx = 0.0f, My = 0.0f, Mz = 0.0f,K = 0.0f, k, mx, my, mz;
 		for (int i = 0; i < world.count; i++) {
 			world.GetMomentum(i, mx, my, mz);
+			world.GetKE(i, k);
 			Mx += mx;
 			My += my;
 			Mz += mz;
+			K += k;
 		}
 		float Msq = Mx * Mx + My * My + Mz * Mz;
 		M_total = std::sqrt(Msq);
+		KE_total = K;
 		
 			//rad.ApplyLarmorDamping(subDt, world, i);
 		auto t2 = std::chrono::high_resolution_clock::now();
@@ -237,14 +251,13 @@ void App::DoFrame()
 	fieldLines.Update(world, rad, 1);     // sphere idx 1
 	fieldLines.Controls();
 
-	// momentum readout after all substeps
 	
 	for (auto& d : drawables)
 	{
 
 		d->Draw(wnd.Gfx());
 	}
-	//fieldLines.Draw(wnd.Gfx());
+	fieldLines.Draw(wnd.Gfx());
 	obj = par.ResetSim(obj);
 
 	static char buffer[1024];
@@ -259,7 +272,7 @@ void App::DoFrame()
 		
 
 	std::wostringstream oss;
-	oss << L"Big Box " << M_total; // << L", Total Energy: " << energy;
+	oss << L"Total momentum " << M_total<< L", Kinetic Energy: " << KE_total;
 	wnd.SetTitle(oss.str());
 	
 	while (!wnd.kbd.KeyIsEmpty())

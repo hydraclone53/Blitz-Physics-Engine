@@ -23,7 +23,7 @@ void PhysicsBody::StepBoris(float dt) noexcept
 
 	// compute gamma from current u — stored for external use
 	float u_sq = dx::XMVectorGetX(dx::XMVector3LengthSq(u));
-	gamma = std::sqrt(1.0f + u_sq / (PhysConst::c * PhysConst::c));
+	gamma = std::sqrt(1.0f + u_sq / (PhysConst::GetC() * PhysConst::GetC()));
 
 	dx::XMFLOAT3 E_field = field.GetEfield(i, j, k);
 	dx::XMFLOAT3 B_field = field.GetMfield(i, j, k);
@@ -66,7 +66,7 @@ void PhysicsBody::StepBoris(float dt) noexcept
 	// --- STEP 4: POSITION UPDATE ---
 	// compute gamma_next from u_next for velocity conversion
 	float u_next_sq = dx::XMVectorGetX(dx::XMVector3LengthSq(u_next));
-	float gamma_next = std::sqrt(1.0f + u_next_sq / (PhysConst::c * PhysConst::c));
+	float gamma_next = std::sqrt(1.0f + u_next_sq / (PhysConst::GetC() * PhysConst::GetC()));
 	dx::XMVECTOR v_next = dx::XMVectorScale(u_next, 1.0f / gamma_next);
 
 	dx::XMVECTOR pos_next = dx::XMVectorAdd(GetPosVector(),

@@ -12,7 +12,7 @@ int Parameters::ResetSim(int o)
 		if (ImGui::Button("Reset Simulation")) {
 			app->ResetSimulation(o);
 		}
-		ImGui::SliderFloat("Speed of light", &PhysConst::c, 1.0f, 80.0f, "%.1f");
+		ImGui::SliderFloat("One for All", &PhysConst::a, 1.0f, 300.0f, "%.1f");
 
 	}
 		ImGui::End();

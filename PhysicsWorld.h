@@ -46,6 +46,7 @@ struct PhysicsWorld
     void StepAllBoris(float dt) noexcept;
     float GetRadiationIntensity(int idx) noexcept;
     void GetMomentum(int idx, float& mx, float& my, float& mz) const noexcept;
+    void GetKE(int idx, float& k) const noexcept;
     void GetVelocity(int idx, float& vx, float& vy, float& vz) const noexcept;
 
     // --- TESTING RETARDATION FIELDS ---

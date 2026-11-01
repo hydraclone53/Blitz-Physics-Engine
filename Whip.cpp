@@ -149,7 +149,7 @@ void Whip::ApplyPolarizabilityBoost(PhysicsWorld& world, float radius)
         float dist_sq = dx * dx + dy * dy + dz * dz;
 
         if (dist_sq < radius_sq)
-            world.polarizability[i] = 0.05f;
+            world.polarizability[i] = 10.05f;
     }
 }
 

@@ -49,6 +49,7 @@ private:
 	bool show_demo_window = true;
 	float speed_factor = 1.0f;
 	float M_total;
+	float KE_total;
 	ChiliTimer timer;
 	InterForce::PairForce pair;
 	InterForce::FieldForce field;

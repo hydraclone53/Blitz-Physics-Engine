@@ -68,7 +68,7 @@ void PhysicsWorld::AddEtotalAll()
 
 void PhysicsWorld::StepAllBoris(float dt) noexcept
 {
-    const float c_sq = PhysConst::c * PhysConst::c;
+    const float c_sq = PhysConst::GetC() * PhysConst::GetC();
 
     for (int idx = 0; idx < count; idx++)
     {
@@ -215,4 +215,12 @@ void PhysicsWorld::TempClear()
     tempPosX.clear();
     tempPosY.clear();
     tempPosZ.clear();
+}
+
+
+void PhysicsWorld::GetKE(int idx, float& k) const noexcept
+{
+    float u_sq = uX[idx] * uX[idx] + uY[idx] * uY[idx] + uZ[idx] * uZ[idx];
+    float gam = gamma[idx];
+    k = mass[idx] * u_sq / (gam + 1);
 }
