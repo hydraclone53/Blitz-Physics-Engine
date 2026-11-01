@@ -49,7 +49,7 @@ App::App()
 	for (int idx : wall.GetParticleIndices())
 	{
 		auto pSphere = std::make_unique<Sphere>(wnd.Gfx(), world, idx,
-			adist, ddist, odist, rng);
+			adist, ddist, odist, rng, false);
 		drawables.push_back(std::move(pSphere));
 	}
 	*/
@@ -95,7 +95,7 @@ void App::ResetSimulation(int obj)
 		float x = rdist(rng), y = rdist(rng), z = rdist(rng);
 		int q = ch(rng);
 		int idx = world.Add(-8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1, 1.0f);
-		int idx2 = world.Add(8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 1.0f);
+		int idx2 = world.Add(8.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1, 1.0f);
 		/*
 		int idx = world.Add(-3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1, 1.0f);
 		 int idx2 = world.Add(3.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1, 1.0f);
@@ -157,12 +157,12 @@ void App::DoFrame()
 				world.posZ.data(), world.count);  
 		}
 		auto t1 = std::chrono::high_resolution_clock::now();
-		pair.CalcCForce(world, coulombHash);
+		//pair.CalcCForce(world, coulombHash); //use when polarization is required
 		//wall.ApplyBondForces(world,1.5f);
 		//int testIdx = wall.GetParticleIndices()[150]; 
 		//wall.ApplyTestImpulse(world, testIdx, 0.0f, 0.0f, 5.0f);  // strong push in Z direction
-		//pair.CalcVandForce(world, vdwHash);
-		//rad.RetardationFields(world,subDt);
+		pair.CalcVandForce(world, vdwHash);
+		rad.RetardationFields(world,subDt);
 		if (step == 0)
 		{
 			ImGui::Begin("Field debug");
